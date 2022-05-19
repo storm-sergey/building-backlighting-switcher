@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
+
 GECKODRIVER = "C:/Scheduler/geckodriver.exe"
 SCHEDULE = "C:/Scheduler/sun.txt"
 ADDRESS_FILENAME = "C:/Users/ecue/Desktop/ActionPad2_address.txt"
-WAIT_PAGE_LOADING_SEC = 10
+WAIT_PAGE_LOADING_SEC = 5
 
 pad_state: set[str] = None
 next_sun_event = {
@@ -22,7 +23,7 @@ def activate():
             driver.get(get_address_from_file(ADDRESS_FILENAME))
             time.sleep(WAIT_PAGE_LOADING_SEC)
             setpad_state(driver)
-            set_next_sun_event()
+            setnext_sun_event()
             direction = next_sun_event['sun_direction']
             if (direction == "sunrise") and check("is_all_off"):
                 turn_on(driver)
@@ -51,31 +52,33 @@ def setpad_state(driver):
             continue
 
 
-def set_next_sun_event(now: datetime = datetime.now()):
+def setnext_sun_event(_now: datetime = None):
+    
+    now = datetime.now() if _now is None else _now
     tomorrow = now + timedelta(days=1)
 
     schedule = get_schedule_at_day(int(now.day), int(now.month))
     schedule_tomorrow = get_schedule_at_day(int(tomorrow.day), int(tomorrow.month))
 
-    upcoming_events = [time_to_timestamp(schedule['sunrise'], now),
-                       time_to_timestamp(schedule['sunset'], now),
-                       time_to_timestamp(schedule_tomorrow['sunrise'], tomorrow),
+    upcoming_events = [time_to_timestamp(schedule['sunrise'], now), \
+                       time_to_timestamp(schedule['sunset'], now), \
+                       time_to_timestamp(schedule_tomorrow['sunrise'], tomorrow), \
                        time_to_timestamp(schedule_tomorrow['sunset'], tomorrow)]
 
     next_sun_event['timestamp'] = get_sun_event(now, upcoming_events)
     next_sun_event['sun_direction'] = get_sun_direction(now, upcoming_events)
-
+    
 
 def get_sun_event(now: datetime, events) -> float:
     for event in events:
         if now.timestamp() < event:
             return event
-    raise Exception("get_sun_event() is failed\n"
-                    + f"now = {now}\n"
+    raise Exception("get_sun_event() is failed\n" \
+                    + f"now = {now}\n" \
                     + f"now.timestamp() = {now.timestamp()}\n"
-                    + f"events[0] = {events[0]}\n"
-                    + f"events[1] = {events[1]}\n"
-                    + f"events[2] = {events[2]}\n"
+                    + f"events[0] = {events[0]}\n" \
+                    + f"events[1] = {events[1]}\n" \
+                    + f"events[2] = {events[2]}\n" \
                     + f"events[3] = {events[3]}\n")
 
 
@@ -88,14 +91,14 @@ def get_sun_direction(now: datetime, events) -> str:
         return 'sunrise'
     if now.timestamp() < events[3]:
         return 'sunset'
-    raise Exception("get_sun_direction() is failed\n"
-                    + f"now = {now}\n"
+    raise Exception("get_sun_direction() is failed\n" \
+                    + f"now = {now}\n" \
                     + f"now.timestamp() = {now.timestamp()}\n"
-                    + f"events[0] = {events[0]}\n"
-                    + f"events[1] = {events[1]}\n"
-                    + f"events[2] = {events[2]}\n"
+                    + f"events[0] = {events[0]}\n" \
+                    + f"events[1] = {events[1]}\n" \
+                    + f"events[2] = {events[2]}\n" \
                     + f"events[3] = {events[3]}\n")
-
+    
 
 def check(mode):
     modes = {
@@ -163,7 +166,7 @@ def get_schedule_at_day(day: int, month: int):
                 }
 
 
-def time_to_datetime(t: str, now=datetime.now()):
+def time_to_datetime(t: str, now = datetime.now()):
     """t: 'hh:mm'"""
     t = t.replace("\n", '')
     hours = int(t.split(':')[0])
@@ -175,13 +178,14 @@ def time_to_datetime(t: str, now=datetime.now()):
                     minutes)
 
 
-def time_to_timestamp(t: str, now=datetime.now()):
+def time_to_timestamp(t: str, now = datetime.now()):
     return time_to_datetime(t, now).timestamp()
 
 
 def test():
     test_times = []
     now = datetime.now()
+
     test_times.append(datetime(now.year, 1, 1, 0, 0))
     test_times.append(datetime(now.year, 6, 15, 18, 0))
     test_times.append(datetime(now.year, 5, 31, 4, 16))
@@ -191,24 +195,52 @@ def test():
     test_times.append(datetime(now.year, 5, 31, 21, 47))
     test_times.append(datetime(now.year, 5, 31, 21, 48))
     test_times.append(datetime(now.year, 12, 31, 23, 59))
-
+    test_times.append(datetime(now.year, 5, 15, 3, 59))
+    test_times.append(datetime(now.year, 5, 15, 6, 59))
+    test_times.append(datetime(now.year, 5, 15, 21, 59))
+    test_times.append(datetime(now.year, 5, 16, 8, 0))
+    
     with webdriver.Firefox(executable_path=GECKODRIVER) as driver:
         driver.get(get_address_from_file(ADDRESS_FILENAME))
         time.sleep(WAIT_PAGE_LOADING_SEC)
+        
         for test_time in test_times:
             setpad_state(driver)
             print(f"---> test for {test_time}:")
-            set_next_sun_event(test_time)
+            setnext_sun_event(test_time)
             direction = next_sun_event['sun_direction']
-            if (direction == "sunrise") and check("is_all_off"):
+            if (direction == 'sunrise') and check("is_all_off"):
+                turn_on(driver)
                 print("off")
-            elif (direction == "sunset") and check("is_something_on"):
+            elif (direction == 'sunset') and check("is_something_on"):
+                turn_off(driver)
                 print("on")
             sun_event_dt = datetime.fromtimestamp(next_sun_event['timestamp']).strftime("%m/%d/%Y, %H:%M:%S")
             print("next sun event datetime: " + sun_event_dt)
             print("next sun event direction: " + next_sun_event['sun_direction'])
-            sleep(is_test=True)
+            sleep(is_test = True)
         driver.quit()
 
 
+def test2():
+    while True:
+        with webdriver.Firefox(executable_path=GECKODRIVER) as driver:
+            driver.get(get_address_from_file(ADDRESS_FILENAME))
+            time.sleep(WAIT_PAGE_LOADING_SEC)
+            setpad_state(driver)
+            setnext_sun_event()         
+            direction = next_sun_event['sun_direction']
+            if (direction == "sunrise") and check("is_all_off"):
+                turn_on(driver)
+            elif (direction == "sunset") and check("is_something_on"):
+                turn_off(driver)
+            driver.quit()
+            sun_event_dt = datetime.fromtimestamp(next_sun_event['timestamp']).strftime("%m/%d/%Y, %H:%M:%S")
+            print("next sun event datetime: " + sun_event_dt)
+            print("next sun event direction: " + next_sun_event['sun_direction'])
+        sleep()
+
+
+#test()
+#test2()
 activate()
